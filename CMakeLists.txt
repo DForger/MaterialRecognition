@@ -60,6 +60,13 @@ include_directories(/usr/include/eigen3)
 #LINK_DIRECTORIES(${OPENNI2_DIR}/Redist/)
 #SET(OPENNI2_LIBRARIES ${OPENNI2_DIR}/Redist/libOpenNI2.so)
 
+##############set up VLFeat ###############
+set (VLFEAT_DIR /home/shenyunjun/App_Home/vlfeat-master)
+include_directories(${VLFEAT_DIR}/)
+link_directories(${VLFEAT_DIR}/bin/glnxa64/)
+set(VLFEAT_LIBS ${VLFEAT_DIR}/bin/glnxa64/libvl.so)
+
+
 ############## include source code ###########
 set(${PROJECT_NAME}_SOURCES
     main.cpp
@@ -127,6 +134,7 @@ else()
     target_link_libraries(${PROJECT_NAME}
         ${QT_LIBRARIES}
         ${OpenCV_LIBS}
+        ${VLFEAT_LIBS}
 #        ${PCL_LIBRARIES}
 #        ${OPENNI2_LIBRARIES}
 #        opengm-external-ad3-shared
