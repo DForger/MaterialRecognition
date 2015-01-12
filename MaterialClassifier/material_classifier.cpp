@@ -5,6 +5,27 @@ MaterialClassifier::MaterialClassifier()
     : m_nFilterKernelWidth(7),
       m_nFilterKernelSetSize(64)
 {
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/fabric/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/foliage/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/glass/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/leather/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/metal/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/paper/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/plastic/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/stone/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/water/"));
+        mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/wood/"));
+
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/aluminium_foil/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/brown_bread/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/corduroy/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/cotton/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/cracker/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/linen/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/orange_peel/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/sandpaper/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/sponge/"));
+//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/styrofoam/"));
 
 }
 
@@ -33,6 +54,17 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
             cv::Mat siftDictionary;
             Miscellaneous::IO::readData_<float>(siftDictionary, dataAddress+"/sift_dictionary");
             m_siftDictionary = siftDictionary;
+        }
+    }
+
+    if(param.useSiftIFV){
+        if(param.buildSIFTGmmDist){
+            buildSiftIFVenCoder(dataAddress);
+            ms_nSiftIFVDimension = m_siftGMMDist.clusterNum*m_siftGMMDist.dimension*2;
+        }else{
+            int siftDim = 128;
+            m_siftGMMDist.load(std::string(dataAddress+"/sift_gmm_info"), siftDim);
+            ms_nSiftIFVDimension = m_siftGMMDist.clusterNum*m_siftGMMDist.dimension*2;
         }
     }
 
@@ -80,26 +112,15 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
     cv::Mat textonBowTrainDataSet = cv::Mat_<float>(nMaxDataSize, ms_nGlobalTextonDictionarySize);
     cv::Mat chromaBowTrainDataSet = cv::Mat_<float>(nMaxDataSize, ms_nChromaDictionarySize);
     cv::Mat labelTrainDataSet = cv::Mat_<float>(nMaxDataSize, 1);
+    cv::Mat siftIfvTrainDataSet = cv::Mat_<float>(nMaxDataSize, ms_nSiftIFVDimension);
 
     cv::Mat siftBowTestDataSet = cv::Mat_<float>(nMaxDataSize, ms_nSiftDictionarySize);
     cv::Mat textonBowTestDataSet = cv::Mat_<float>(nMaxDataSize, ms_nGlobalTextonDictionarySize);
     cv::Mat chromaBowTestDataSet = cv::Mat_<float>(nMaxDataSize, ms_nChromaDictionarySize);
     cv::Mat labelTestDataSet = cv::Mat_<float>(nMaxDataSize, 1);
-
+    cv::Mat siftIfvTestDataSet = cv::Mat_<float>(nMaxDataSize, ms_nSiftIFVDimension);
 
     if(!param.useComputeFeatureSet){
-        std::map<int, std::string> mapIndex2FileDirectory;
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/fabric/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/foliage/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/glass/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/leather/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/metal/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/paper/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/plastic/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/stone/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/water/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/wood/"));
-
 
         int nTestDataCnt = 0;
         int nTrainDataCnt = 0;
@@ -117,6 +138,7 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
             cv::Mat textonBoWSet = cv::Mat_<float>(nMaxSingleClassSize, ms_nGlobalTextonDictionarySize);
             cv::Mat chromaBoWSet = cv::Mat_<float>(nMaxSingleClassSize, ms_nChromaDictionarySize);
 
+
             struct dirent *dirIter = readdir(pDir);
             int nImgCnt = 0;
             while(dirIter != NULL){
@@ -126,20 +148,17 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
                 std::string imgAddress = strImgDirAddress +fileName;
                 std::string maskAddress = strMaskDirAddress + fileName;
 
-                std::string imgSiftSaveAddress = imgAddress;
-                std::string imgTextonSaveAddress = imgAddress;
-                int nDotIndex = imgSiftSaveAddress.find_last_of('.');
-                int nLength = imgSiftSaveAddress.length();
-                imgSiftSaveAddress.erase(imgSiftSaveAddress.begin()+nDotIndex, imgSiftSaveAddress.begin()+nLength-1);
-                imgSiftSaveAddress.append("_sift_bow");
-
-                imgTextonSaveAddress.erase(imgTextonSaveAddress.begin()+ nDotIndex, imgTextonSaveAddress.begin()+nLength-1);
-                imgTextonSaveAddress.append("_texton_bow");
+                int nDotIndex = imgAddress.find_last_of('.');
+                int nLength = imgAddress.length();
 
                 cv::Mat img = cv::imread(imgAddress);
                 cv::Mat mask = cv::imread(maskAddress, IMREAD_GRAYSCALE);
                 if(img.empty()){
                     continue;
+                }
+
+                if(mask.empty()){
+                    mask = cv::Mat_<uchar>(img.rows, img.cols, (uchar)255);
                 }
 
                 std::cout<<"computing "<<imgAddress<<std::endl;
@@ -148,6 +167,10 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
                 if(param.useSIFT){
                     cv::Mat siftDist;
                     extractSIFTDist(img, mask, siftDist);
+
+                    std::string imgSiftSaveAddress = imgAddress;
+                    imgSiftSaveAddress.erase(imgSiftSaveAddress.begin()+nDotIndex, imgSiftSaveAddress.begin()+nLength-1);
+                    imgSiftSaveAddress.append("_sift_bow");
                     Miscellaneous::IO::data2Text_<float>(siftDist, imgSiftSaveAddress);
 
                     float *srcPtr = siftDist.ptr<float>(0);
@@ -178,11 +201,15 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
                     }
                 }
 
-
                 if(param.useTexton){
                     cv::Mat textonDist;
                     extractTextonDist(img, mask, textonDist);
+
+                    std::string imgTextonSaveAddress = imgAddress;
+                    imgTextonSaveAddress.erase(imgTextonSaveAddress.begin()+ nDotIndex, imgTextonSaveAddress.begin()+nLength-1);
+                    imgTextonSaveAddress.append("_texton_bow");
                     Miscellaneous::IO::data2Text_<float>(textonDist, imgTextonSaveAddress);
+
                     float *srcPtr = textonDist.ptr<float>(0);
                     float *dstPtr = textonBoWSet.ptr<float>(nImgCnt);
                     for(int k = 0; k < ms_nGlobalTextonDictionarySize; ++k){
@@ -211,8 +238,40 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
 
                 }
 
+                if(param.useSiftIFV){
+                    cv::Mat siftIfv;
+                    extractSiftIFV(img, mask, siftIfv, m_siftGMMDist);
+
+                    std::string imgSiftIfvAddress = imgAddress;
+                    imgSiftIfvAddress.erase(imgSiftIfvAddress.begin()+ nDotIndex, imgSiftIfvAddress.begin()+nLength-1);
+                    imgSiftIfvAddress.append("_sift_ifv");
+                    Miscellaneous::IO::data2Text_<float>(siftIfv, imgSiftIfvAddress);
+
+
+                    float *srcPtr;
+                    float *dstPtr ;
+
+                    if(nImgCnt >= nTrainDataSize){
+                        srcPtr = siftIfv.ptr<float>(0);
+                        dstPtr = siftIfvTestDataSet.ptr<float>(nTestDataCnt);
+                        for(int k = 0; k < ms_nSiftIFVDimension; ++k){
+                            *dstPtr = *srcPtr;
+                            ++dstPtr;
+                            ++srcPtr;
+                        }
+                    }else{
+                        srcPtr = siftIfv.ptr<float>(0);
+                        dstPtr = siftIfvTrainDataSet.ptr<float>(nTrainDataCnt);
+                        for(int k = 0; k < ms_nSiftIFVDimension; ++k){
+                            *dstPtr = *srcPtr;
+                            ++dstPtr;
+                            ++srcPtr;
+                        }
+                    }
+                }
+
                 if(nImgCnt >= nTrainDataSize){
-                    labelTestDataSet.at<float>(nTestDataCnt,0) = i;
+                    labelTestDataSet.at<float>(nTestDataCnt, 0) = i;
                     ++nTestDataCnt;
                 }else{
                     labelTrainDataSet.at<float>(nTrainDataCnt, 0) = i;
@@ -245,11 +304,13 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
         siftBowTrainDataSet.adjustROI(0, nTrainDataCnt-nMaxDataSize, 0, 0);
         textonBowTrainDataSet.adjustROI(0, nTrainDataCnt-nMaxDataSize, 0, 0);
         chromaBowTrainDataSet.adjustROI(0, nTrainDataCnt-nMaxDataSize, 0, 0);
+        siftIfvTrainDataSet.adjustROI(0, nTrainDataCnt-nMaxDataSize, 0, 0);
 
         labelTestDataSet.adjustROI(0, nTestDataCnt-nMaxDataSize, 0, 0);
         siftBowTestDataSet.adjustROI(0, nTestDataCnt-nMaxDataSize, 0, 0);
         textonBowTestDataSet.adjustROI(0, nTestDataCnt-nMaxDataSize, 0, 0);
         chromaBowTestDataSet.adjustROI(0, nTestDataCnt-nMaxDataSize, 0, 0);
+        siftIfvTestDataSet.adjustROI(0, nTestDataCnt-nMaxDataSize, 0, 0);
 
         Miscellaneous::IO::data2Text_<float>(labelTrainDataSet, dataAddress+"/train_label_set");
         Miscellaneous::IO::data2Text_<float>(labelTestDataSet, dataAddress+"/test_label_set");
@@ -262,6 +323,11 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
         if(param.useTexton){
             Miscellaneous::IO::data2Text_<float>(textonBowTrainDataSet, dataAddress+"/org_texton_bow_train_data");
             Miscellaneous::IO::data2Text_<float>(textonBowTestDataSet, dataAddress+"/org_texton_bow_test_data");
+        }
+
+        if(param.useSiftIFV){
+            Miscellaneous::IO::data2Text_<float>(siftIfvTrainDataSet, dataAddress+"/org_sift_ifv_train_data");
+            Miscellaneous::IO::data2Text_<float>(siftIfvTestDataSet, dataAddress+"/org_sift_ifv_test_data");
         }
 
     }else{
@@ -277,6 +343,11 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
             Miscellaneous::IO::readData_<float>(textonBowTrainDataSet, dataAddress+"/org_texton_bow_train_data");
             Miscellaneous::IO::readData_<float>(textonBowTestDataSet, dataAddress+"/org_texton_bow_test_data");
         }
+
+        if(param.useSiftIFV){
+            Miscellaneous::IO::readData_<float>(siftIfvTrainDataSet, dataAddress+"/org_sift_ifv_train_data");
+            Miscellaneous::IO::readData_<float>(siftIfvTestDataSet, dataAddress+"/org_sift_ifv_test_data");
+        }
     }
 
 
@@ -286,6 +357,7 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
     cv::Mat projectedsiftBowTrainDataSet;
     cv::Mat projectedtextonBowTrainDataSet;
     cv::Mat projectedchromaBowTrainDataSet;
+    cv::Mat projectedSiftIfvTrainDataSet;
 
     cv::Mat label;
     labelTrainDataSet.convertTo(label, CV_32SC1);
@@ -296,7 +368,6 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
         siftEigenVector.convertTo(siftEigenVector, CV_32F);
         Miscellaneous::IO::data2Text_<float>(siftEigenVector,dataAddress+"/sift_eigen");
         projectedsiftBowTrainDataSet = siftBowTrainDataSet*siftEigenVector;
-
     }
 
     if(param.useTexton){
@@ -306,7 +377,6 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
         Miscellaneous::IO::data2Text_<float>(textonEigenVector, dataAddress+"/texton_eigen");
         projectedtextonBowTrainDataSet = textonBowTrainDataSet*textonEigenVector;
     }
-
 
 
     //    cv::Mat combined = cv::Mat_<float>(projectedtextonBowTrainDataSet.rows, projectedtextonBowTrainDataSet.cols*2);
@@ -322,17 +392,21 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
     knnParam.defaultK = 30;
     cv::Ptr<cv::ml::KNearest> knn = cv::ml::StatModel::train<cv::ml::KNearest>(siftBowTrainDataSet, cv::ml::ROW_SAMPLE, label, knnParam);
 
-    cv::ml::SVM::Params svmParams;
+    cv::ml::Boost::Params boostParam;
+    boostParam.CVFolds = 10;
+    boostParam.maxDepth = 6;
+    cv::Ptr<cv::ml::Boost> boost = cv::ml::StatModel::train<cv::ml::Boost>(siftBowTrainDataSet, cv::ml::ROW_SAMPLE, label, boostParam);
 
+    cv::ml::SVM::Params svmParams;
     double epsilon = 1e-7;
     svmParams.svmType = cv::ml::SVM::C_SVC;
-    svmParams.kernelType = cv::ml::SVM::RBF;
+    svmParams.kernelType = cv::ml::SVM::LINEAR;
     svmParams.degree = 3;
     svmParams.gamma = 0.01;
     svmParams.C = 0.1;
     svmParams.termCrit = cv::TermCriteria(cv::TermCriteria::MAX_ITER+cv::TermCriteria::EPS, 100000, epsilon);
 
-    cv::Ptr<cv::ml::SVM> svm = cv::ml::StatModel::train<cv::ml::SVM>(siftBowTrainDataSet, cv::ml::ROW_SAMPLE, label, svmParams);
+    cv::Ptr<cv::ml::SVM> svm = cv::ml::StatModel::train<cv::ml::SVM>(siftIfvTrainDataSet, cv::ml::ROW_SAMPLE, label, svmParams);
     cv::Mat sv = svm->getSupportVectors();
     std::cout<<"support vector "<<sv.rows<<std::endl;
     std::cout.flush();
@@ -340,9 +414,9 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
 
     //compute E_in
     cv::Mat predictedTrainLabel;
-    svm->predict(siftBowTrainDataSet, predictedTrainLabel);
-//    knn->findNearest(siftBowTrainDataSet, 30, predictedTrainLabel);
-
+    svm->predict(siftIfvTrainDataSet, predictedTrainLabel);
+    //    knn->findNearest(siftBowTrainDataSet, 30, predictedTrainLabel);
+    //    boost->predict(siftBowTrainDataSet, predictedTrainLabel);
 
     double Ein = 0;
     for(int i = 0; i < predictedTrainLabel.rows; ++i){
@@ -357,9 +431,9 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
 
     //compute E_out
     cv::Mat predictedTestLabel;
-    svm->predict(siftBowTestDataSet, predictedTestLabel);
-
-//    knn->findNearest(siftBowTestDataSet, 30, predictedTestLabel);
+    svm->predict(siftIfvTestDataSet, predictedTestLabel);
+    //    knn->findNearest(siftBowTestDataSet, 30, predictedTestLabel);
+    //    boost->predict(siftBowTestDataSet, predictedTestLabel);
 
     double Eout = 0;
     for(int i = 0; i < predictedTestLabel.rows; ++i){
@@ -470,11 +544,20 @@ void MaterialClassifier::extractTextonDist(cv::Mat img, cv::Mat mask,  cv::Mat &
             responsePtr = basePtr;
             cv::Mat testVector = cv::Mat_<float>(1, m_nFilterKernelSetSize, responsePtr);
 
+            float weightDist[ms_nSiftDictionarySize];
+            float weightSum = 0;
             for(int j = 0; j < ms_nGlobalTextonDictionarySize; ++j){
                 double correl = cv::compareHist(testVector, m_globalTextonDictionary.row(j), cv::HISTCMP_CORREL);
-                voteSum = voteSum + correl;
-                voteBins[j] = voteBins[j] + correl;
+                weightSum = weightSum + correl;
+                weightDist[j] = correl;
             }
+
+            for(int j = 0; j < ms_nGlobalTextonDictionarySize; ++j){
+                voteBins[j] += weightDist[j]/weightSum;
+            }
+
+            voteSum += 1;
+
         }
     }
 
@@ -506,7 +589,7 @@ void MaterialClassifier::extractSIFTDist(Mat img, Mat mask, Mat &siftDist)
     }
 
     //detect dense sift
-    VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 5, 16);
+    VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 8, 12);
     vl_dsift_process(dsift, imgArray);
     const float *fpDescriptorPtr = vl_dsift_get_descriptors(dsift);
     int nDescriptorSize = vl_dsift_get_descriptor_size(dsift);
@@ -531,11 +614,20 @@ void MaterialClassifier::extractSIFTDist(Mat img, Mat mask, Mat &siftDist)
             *dstPtr = fpDescriptorPtr[i*nDescriptorSize+j];
             ++dstPtr;
         }
+        float weightDist[ms_nSiftDictionarySize];
+        float weightSum = 0;
         for(int j = 0; j < ms_nSiftDictionarySize; ++j){
-            double correl = cv::compareHist(siftDescriptor, m_siftDictionary.row(j), cv::HISTCMP_CORREL);
-            votedBin[j] += correl;
-            voteSum = voteSum + correl;
+            cv::Mat diff = siftDescriptor - m_siftDictionary.row(j);
+            double prob = std::exp(-diff.dot(diff));
+            weightDist[j] = prob;
+            weightSum = weightSum + prob;
         }
+
+        //voting
+        for(int j = 0 ; j < ms_nSiftDictionarySize; ++j){
+            votedBin[j] += weightDist[j]/weightSum;
+        }
+        voteSum = voteSum + 1;
     }
 
     //normalize
@@ -550,20 +642,63 @@ void MaterialClassifier::extractSIFTDist(Mat img, Mat mask, Mat &siftDist)
     vl_dsift_delete(dsift);
 }
 
+void MaterialClassifier::extractSiftIFV(Mat img, Mat mask, Mat &siftIfv, GMM &gmmDist)
+{
+    int nRow = img.rows;
+    int nCol = img.cols;
+    float imgArray[nRow*nCol];
+    //convert to vlfeat's image format
+    for(int k = 0; k < nRow; ++k){
+        uchar *srcPtr = img.ptr<uchar>(k);
+        float *dstPtr = imgArray + k*nCol;
+        for(int l = 0; l < nCol; ++l){
+            *dstPtr = (float)(*srcPtr);
+            ++dstPtr;
+            ++srcPtr;
+        }
+    }
+
+    //detect dense sift
+    VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 6, 12);
+    vl_dsift_process(dsift, imgArray);
+    const float *siftDescriptorPtr = vl_dsift_get_descriptors(dsift);
+    int nDescriptorSize = vl_dsift_get_descriptor_size(dsift);
+    int nKeyPointNum = vl_dsift_get_keypoint_num(dsift);
+    const VlDsiftKeypoint *keyPoints =  vl_dsift_get_keypoints(dsift);
+
+    int ifvLength = 2 * gmmDist.dimension * gmmDist.clusterNum;
+
+    // allocate space for the encoding
+    void *enc = vl_malloc(sizeof(float) * ifvLength);
+
+    // run fisher encoding
+    vl_fisher_encode(
+                enc,
+                VL_TYPE_FLOAT,
+                gmmDist.mean,
+                gmmDist.dimension,
+                gmmDist.clusterNum,
+                gmmDist.covariance,
+                gmmDist.prior,
+                siftDescriptorPtr, nKeyPointNum,
+                VL_FISHER_FLAG_IMPROVED
+                ) ;
+
+    cv::Mat siftHist = cv::Mat_<float>(1, ifvLength);
+
+    float *ifvDstPtr = siftHist.ptr<float>(0);
+    float *ifvSrcPtr = static_cast<float*>(enc);
+    for(int i = 0; i < ifvLength; ++i){
+        ifvDstPtr[i] = ifvSrcPtr[i];
+    }
+
+    siftIfv = siftHist;
+
+    vl_dsift_delete(dsift);
+}
+
 void MaterialClassifier::buildFilterKernelSet(string dataAddress)
 {
-    std::map<int, std::string> mapIndex2FileDirectory;
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/fabric/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/foliage/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/glass/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/leather/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/metal/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/paper/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/plastic/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/stone/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/water/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/wood/"));
-
 
     int nKernelLength = m_nFilterKernelWidth * m_nFilterKernelWidth;
     int nHalfKernelSize = m_nFilterKernelWidth/2;
@@ -608,6 +743,10 @@ void MaterialClassifier::buildFilterKernelSet(string dataAddress)
             }
 
             ++nImgCnt;
+
+            if(mask.empty()){
+                mask = cv::Mat_<uchar>(img.rows, img.cols, (uchar)255);
+            }
 
             cv::Mat grayImg;
             cv::cvtColor(img, grayImg, cv::COLOR_BGR2GRAY);
@@ -710,18 +849,6 @@ void MaterialClassifier::buildFilterKernelSet(string dataAddress)
 
 void MaterialClassifier::buildGlobalTextonDictionary(string dataAddress)
 {
-    std::map<int, std::string> mapIndex2FileDirectory;
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/fabric/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/foliage/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/glass/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/leather/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/metal/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/paper/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/plastic/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/stone/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/water/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/wood/"));
-
     int nHalfKernelSize = m_nFilterKernelWidth/2;
 
     int nMaxDataSize = 500000;
@@ -750,11 +877,14 @@ void MaterialClassifier::buildGlobalTextonDictionary(string dataAddress)
                 continue;
             }
             //80 for training and 20 for testing
-            if(nImgCnt > 80){
+            if(nImgCnt > 50){
                 continue;
             }
-
             ++nImgCnt;
+
+            if(mask.empty()){
+                mask = cv::Mat_<uchar>(img.rows, img.cols, (uchar)255);
+            }
 
             cv::Mat totalResponse;
             //compute filtering response
@@ -836,19 +966,6 @@ void MaterialClassifier::buildGlobalTextonDictionary(string dataAddress)
 
 void MaterialClassifier::buildSIFTDictionary(string dataAddress)
 {
-    std::map<int, std::string> mapIndex2FileDirectory;
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/fabric/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/foliage/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/glass/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/leather/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/metal/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/paper/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/plastic/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/stone/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/water/"));
-    mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/wood/"));
-
-
     int nMaxDataSize = 3000000;
     int nSiftDim = 128;
     cv::Mat siftDescriptorSet = cv::Mat_<float>(nMaxDataSize, nSiftDim);
@@ -879,11 +996,16 @@ void MaterialClassifier::buildSIFTDictionary(string dataAddress)
             if(img.empty()){
                 continue;
             }
+
             //50 for training and 50 for testing
             if(nImgCnt > 50){
                 continue;
             }
             ++nImgCnt;
+
+            if(mask.empty()){
+                mask = cv::Mat_<uchar>(img.rows, img.cols, (uchar)255);
+            }
 
             int nRow = img.rows;
             int nCol = img.cols;
@@ -900,7 +1022,7 @@ void MaterialClassifier::buildSIFTDictionary(string dataAddress)
             }
 
             //detect dense sift
-            VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 5, 16);
+            VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 8, 12);
 
             vl_dsift_process(dsift, imgArray);
             const float *fpDescriptorPtr = vl_dsift_get_descriptors(dsift);
@@ -928,7 +1050,7 @@ void MaterialClassifier::buildSIFTDictionary(string dataAddress)
         closedir(pDir);
     }
 
-    //k-mean cluster to build texton
+    //k-mean cluster to build sift dictionary
     siftDescriptorSet.adjustROI(0,nDataCnt-nMaxDataSize,0,0);
     int K = ms_nSiftDictionarySize;
     cv::TermCriteria critera;
@@ -944,9 +1066,243 @@ void MaterialClassifier::buildSIFTDictionary(string dataAddress)
     Miscellaneous::IO::data2Text_<float>(centers, dataAddress+"/sift_dictionary");
 }
 
+void MaterialClassifier::buildSiftIFVenCoder(string dataAddress)
+{
+    int nMaxDataSize = 3000000;
+    int nSiftDim = 128;
+    cv::Mat siftDescriptorSet = cv::Mat_<float>(nMaxDataSize, nSiftDim);
+
+//    Miscellaneous::IO::readData_<float>(siftDescriptorSet,dataAddress+"/sift_descriptors_set");
+    int nDataCnt = 0;
+    for(int i = 0; i  < mapIndex2FileDirectory.size(); ++i){
+        std::string strImgDirAddress = dataAddress+"/image"+mapIndex2FileDirectory[i];
+        std::string strMaskDirAddress = dataAddress+"/mask"+mapIndex2FileDirectory[i];
+        DIR *pDir = opendir(strImgDirAddress.c_str());
+        if(pDir == NULL){
+            continue;
+        }
+        struct dirent *dirIter = readdir(pDir);
+        int nImgCnt = 0;
+        while(dirIter != NULL){
+            std::string fileName(dirIter->d_name);
+            dirIter = readdir(pDir);
+
+            std::string imgAddress = strImgDirAddress +fileName;
+            std::string maskAddress = strMaskDirAddress + fileName;
+
+            std::string imgSiftSaveAddress = imgAddress;
+            int nDotIndex = imgSiftSaveAddress.find_last_not_of('.');
+            imgSiftSaveAddress.erase(imgSiftSaveAddress.begin()+nDotIndex, imgSiftSaveAddress.begin()+imgSiftSaveAddress.length()-1);
+            imgSiftSaveAddress.append("_sift_descriptor");
+
+            cv::Mat img = cv::imread(imgAddress, IMREAD_GRAYSCALE);
+            cv::Mat mask = cv::imread(maskAddress, IMREAD_GRAYSCALE);
+            if(img.empty()){
+                continue;
+            }
+
+            //50 for training and 50 for testing
+            if(nImgCnt > 50){
+                continue;
+            }
+            ++nImgCnt;
+
+            if(mask.empty()){
+                mask = cv::Mat_<uchar>(img.rows, img.cols, (uchar)255);
+            }
+
+            int nRow = img.rows;
+            int nCol = img.cols;
+            float imgArray[nRow*nCol];
+            //convert to vlfeat's image format
+            for(int k = 0; k < nRow; ++k){
+                uchar *srcPtr = img.ptr<uchar>(k);
+                float *dstPtr = imgArray + k*nCol;
+                for(int l = 0; l < nCol; ++l){
+                    *dstPtr = (float)(*srcPtr);
+                    ++dstPtr;
+                    ++srcPtr;
+                }
+            }
+
+            //detect dense sift
+            VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 8, 12);
+
+            vl_dsift_process(dsift, imgArray);
+            const float *fpDescriptorPtr = vl_dsift_get_descriptors(dsift);
+            int nDescriptorSize = vl_dsift_get_descriptor_size(dsift);
+            int nKeyPointNum = vl_dsift_get_keypoint_num(dsift);
+            const VlDsiftKeypoint *keyPoints =  vl_dsift_get_keypoints(dsift);
+
+            for(int k = 0; k < nKeyPointNum; ++k){
+                int x = keyPoints[k].x;
+                int y = keyPoints[k].y;
+                if(mask.at<uchar>(y,x) < 100){
+                    continue;
+                }
+                //add to data set
+                float *dstPtr = siftDescriptorSet.ptr<float>(nDataCnt);
+                for(int l = 0; l < nDescriptorSize; ++l){
+                    *dstPtr = fpDescriptorPtr[k*nDescriptorSize+l];
+                    ++dstPtr;
+                }
+                ++nDataCnt;
+            }
+            vl_dsift_delete(dsift);
+            //            Miscellaneous::IO::data2Text_<float>(siftDescriptor, imgSiftSaveAddress);
+        }
+        closedir(pDir);
+    }
+
+    //build gmm distribution
+    siftDescriptorSet.adjustROI(0,nDataCnt-nMaxDataSize,0,0);
+
+    Miscellaneous::IO::data2Text_<float>(siftDescriptorSet, dataAddress+"/sift_descriptors_set");
+
+//    cv::Mat siftDescriptorSet;
+//    Miscellaneous::IO::readData_<float>(siftDescriptorSet, dataAddress+"/sift_descriptors_set");
+    int descriptorNum = siftDescriptorSet.rows;
+    int descriptorSize = siftDescriptorSet.cols;
+    float data[800000];
+
+    int cnt = 0;
+    int maxNum = 800000/128;
+    for(int i = 0; i < maxNum; ++i){
+//        float *srcPtr = siftDescriptorSet.ptr<float>(i);
+//        float *dstPtr = data + i*siftDescriptorSet.cols;
+//        for(int j = 0; j < siftDescriptorSet.cols; ++j){
+//            *dstPtr = *srcPtr;
+//            ++dstPtr;
+//            ++srcPtr;
+//        }
+        for(int j = 0; j <descriptorSize; ++j){
+            data[i*descriptorSize + j] = siftDescriptorSet.at<float>(i,j);
+        }
+    }
+
+    int dimension = nSiftDim;
+    int numData = maxNum;
+    int numClusters = ms_nSiftDictionarySize;
+
+    VlGMM *gmm = vl_gmm_new (VL_TYPE_FLOAT, nSiftDim, numClusters) ;
+    vl_gmm_cluster(gmm, data, numData);
+
+    const void *gmmMeans = vl_gmm_get_means(gmm);
+    const void *gmmCovariance = vl_gmm_get_covariances(gmm);
+    const void *prior = vl_gmm_get_priors(gmm);
+
+    cv::Mat siftGmmInfo = cv::Mat_<float>(numClusters, dimension+dimension+1);//mean + digonal covariance + prior
+
+    for(int i = 0; i < numClusters; ++i){
+        float *dstGmmPtr = siftGmmInfo.ptr<float>(i);
+        const float *fGmmMeans = static_cast<const float*>(gmmMeans);
+        const float *fGmmCov = static_cast<const float*>(gmmCovariance);
+        const float *fGmmPrior = static_cast<const float*>(prior);
+
+        for(int j = 0; j < dimension; ++j){
+            *dstGmmPtr = fGmmMeans[i*dimension + j];
+            ++dstGmmPtr;
+        }
+
+        for(int j = 0; j < dimension; ++j){
+            *dstGmmPtr = fGmmCov[i*dimension + j];
+            ++dstGmmPtr;
+        }
+
+        *dstGmmPtr = fGmmPrior[i];
+    }
+
+    Miscellaneous::IO::data2Text_<float>(siftGmmInfo, dataAddress+"/sift_gmm_info");
+
+    m_siftGMMDist.load(std::string(dataAddress+"/sift_gmm_info"), dimension);
+
+}
+
 void MaterialClassifier::buildChromaDictionary(string dataAddress)
 {
+    int nMaxDataSize = 500000;
+    int nColorPatchWidth = 3;
+    int nHalfColorPatchWidth = 1;
+    int nColorPatchLength = 27;
+    cv::Mat colorPatchDataSet = cv::Mat_<float>(nMaxDataSize, nColorPatchLength);
+    int nDataCnt = 0;
+    for(int i = 0; i  < mapIndex2FileDirectory.size(); ++i){
+        std::string strImgDirAddress = dataAddress+"/image"+mapIndex2FileDirectory[i];
+        std::string strMaskDirAddress = dataAddress+"/mask"+mapIndex2FileDirectory[i];
+        DIR *pDir = opendir(strImgDirAddress.c_str());
+        if(pDir == NULL){
+            continue;
+        }
+        struct dirent *dirIter = readdir(pDir);
+        int nImgCnt = 0;
+        while(dirIter != NULL){
+            std::string fileName(dirIter->d_name);
+            dirIter = readdir(pDir);
 
+            std::string imgAddress = strImgDirAddress +fileName;
+            std::string maskAddress = strMaskDirAddress + fileName;
+
+            cv::Mat img = cv::imread(imgAddress);
+            cv::Mat mask = cv::imread(maskAddress, IMREAD_GRAYSCALE);
+            if(img.empty()){
+                continue;
+            }
+            //80 for training and 20 for testing
+            if(nImgCnt > 80){
+                continue;
+            }
+            ++nImgCnt;
+
+            if(mask.empty()){
+                mask = cv::Mat_<uchar>(img.rows, img.cols, (uchar)255);
+            }
+
+            //sample response value
+            int nCol = img.cols;
+            int nRow = img.rows;
+            int nMaxX = nCol - nHalfColorPatchWidth;
+            int nMinX = nHalfColorPatchWidth;
+            int nMaxY = nRow - nHalfColorPatchWidth;
+            int nMinY = nHalfColorPatchWidth;
+            for(int y = nMinY; y < nMaxY; y+=5){
+                for(int x = nMinX; x < nMaxX; x+=5){
+                    uchar maskValue = mask.at<uchar>(y, x);
+                    if(maskValue <= 1){
+                        continue;
+                    }
+                    float lucky = std::rand()*1.0/RAND_MAX;
+                    if(lucky > 0.05){
+                        continue;
+                    }
+
+                    if(nDataCnt >= nMaxDataSize){
+                        break;
+                    }
+
+
+
+                    ++nDataCnt;
+                }
+            }
+        }
+        closedir(pDir);
+    }
+
+    //k-mean cluster to build texton
+
+    //    filterResponseSet.adjustROI(0,nDataCnt-nMaxDataSize,0,0);
+    //    int K = ms_nGlobalTextonDictionarySize;
+    //    cv::TermCriteria critera;
+    //    critera.type = cv::TermCriteria::MAX_ITER+cv::TermCriteria::EPS;
+    //    critera.maxCount = 500;
+    //    critera.epsilon = 0.1;
+    //    cv::Mat bestLabels;
+    //    cv::Mat centers;
+    //    cv::kmeans(filterResponseSet, K, bestLabels, critera, 20, cv::KMEANS_PP_CENTERS, centers);
+
+    //    m_globalTextonDictionary = centers;
+
+    //    Miscellaneous::IO::data2Text_<float>(centers, dataAddress+"/texton_dictionary");
 }
 
 void MaterialClassifier::buildColorModelSet(string dataAddress)
@@ -962,3 +1318,4 @@ void MaterialClassifier::buildModelSet(string dataAddress)
 size_t MaterialClassifier::ms_nGlobalTextonDictionarySize = 48;
 size_t MaterialClassifier::ms_nChromaDictionarySize = 64;
 size_t MaterialClassifier::ms_nSiftDictionarySize = 128;
+size_t MaterialClassifier::ms_nSiftIFVDimension = 60;

@@ -12,11 +12,97 @@
 
 #include <vl/generic.h>
 #include <vl/dsift.h>
+#include <vl/gmm.h>
+#include <vl/fisher.h>
 
 struct MaterialFeatureSet{
     std::vector<cv::Mat> vecMaterialFeatures;
     cv::Mat textonHistogram;
     cv::Mat chromaHistogram;
+};
+
+class GMM{
+public:
+    GMM()
+        :mean(NULL),
+        covariance(NULL),
+        prior(NULL){
+
+    }
+
+    ~GMM(){
+        if(mean != NULL){
+            delete[] mean;
+        }
+
+        if(covariance != NULL){
+            delete[] covariance;
+        }
+
+        if(prior != NULL){
+            delete[] prior;
+        }
+    }
+
+    bool load(std::string fileName, int dimension){
+        cv::Mat gmmInfo;
+        Miscellaneous::IO::readData_<float>(gmmInfo, fileName);
+
+        if(gmmInfo.cols != (dimension*2+1)){
+            return false;
+        }
+
+        if(mean != NULL){
+            delete[] mean;
+        }
+        if(covariance != NULL){
+            delete[] covariance;
+        }
+        if(prior != NULL){
+            delete[] prior;
+        }
+
+        this->clusterNum = gmmInfo.rows;
+        this->dimension = dimension;
+        mean = new float[dimension*clusterNum];
+        covariance = new float[dimension*clusterNum];
+        prior = new float[clusterNum];
+        vecMean.resize(clusterNum);
+        vecCovMat.resize(clusterNum);
+
+
+        for(int i = 0; i < clusterNum; ++i){
+            float *gmmPtr = gmmInfo.ptr<float>(i);
+
+            for(int j = 0; j < dimension; ++j){
+                mean[i*dimension+j] = *gmmPtr;
+                ++gmmPtr;
+            }
+            cv::Mat meanMat = cv::Mat_<float>(1, dimension, mean+i*dimension);
+            vecMean[i] = meanMat;
+
+            cv::Mat covMat = cv::Mat_<float>(dimension, dimension, float(0));
+            for(int j = 0; j < dimension; ++j){
+                covariance[i*dimension+j] = *gmmPtr;
+                covMat.at<float>(j,j) = *gmmPtr;
+                ++gmmPtr;
+            }
+            vecCovMat[i] = covMat;
+
+            prior[i] = *gmmPtr;
+        }
+
+        return true;
+    }
+
+    int dimension;
+    int clusterNum;
+    float *mean;
+    float *covariance;
+    float *prior;
+    std::vector<cv::Mat> vecMean;
+    std::vector<cv::Mat> vecCovMat;
+
 };
 
 struct MaterialParam{
@@ -25,9 +111,11 @@ struct MaterialParam{
         : useTexton(true),
           useSIFT(true),
           useChroma(false),
+          useSiftIFV(false),
           buildTextonDictionary(false),
           buildFilterBank(false),
           buildSIFTDictionary(false),
+          buildSIFTGmmDist(false),
           buildChromaDictionary(false),
           useComputeFeatureSet(false),
           computeEigen(true){}
@@ -35,10 +123,12 @@ struct MaterialParam{
     bool useTexton;
     bool useSIFT;
     bool useChroma;
+    bool useSiftIFV;
 
     bool buildTextonDictionary;
     bool buildFilterBank;
     bool buildSIFTDictionary;
+    bool buildSIFTGmmDist;
     bool buildChromaDictionary;
 
     bool useComputeFeatureSet;
@@ -70,6 +160,8 @@ public:
 
     void extractSIFTDist(cv::Mat img, cv::Mat mask, cv::Mat &siftDist);
 
+    void extractSiftIFV(cv::Mat img, cv::Mat mask, cv::Mat &siftIfv, GMM &gmmDist);
+
     void buildFilterKernelSet(std::string dataAddress);
 
 //    void buildTextonDictionarySet(std::string dataAddress);
@@ -77,6 +169,9 @@ public:
     void buildGlobalTextonDictionary(std::string dataAddress);
 
     void buildSIFTDictionary(std::string dataAddress);
+
+    void buildSiftIFVenCoder(std::string dataAddress);
+
 
     void buildChromaDictionary(std::string dataAddress);
 
@@ -102,6 +197,7 @@ private:
     static size_t ms_nGlobalTextonDictionarySize;
     static size_t ms_nSiftDictionarySize;
     static size_t ms_nChromaDictionarySize;
+    static size_t ms_nSiftIFVDimension;
 
     std::vector<size_t> m_vecClassModelSize;
     std::vector<cv::Mat> m_vecClassModelSet;
@@ -109,6 +205,12 @@ private:
 
     cv::Mat m_globalTextonDictionary;
     cv::Mat m_siftDictionary;
+    GMM m_siftGMMDist;
+
+    //data dir
+    std::map<int, std::string> mapIndex2FileDirectory;
+
+
 
 };
 
