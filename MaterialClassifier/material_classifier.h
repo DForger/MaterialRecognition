@@ -14,6 +14,7 @@
 #include <vl/dsift.h>
 #include <vl/gmm.h>
 #include <vl/fisher.h>
+#include <vl/svm.h>
 
 struct MaterialFeatureSet{
     std::vector<cv::Mat> vecMaterialFeatures;
@@ -110,26 +111,30 @@ struct MaterialParam{
     MaterialParam()
         : useTexton(true),
           useSIFT(true),
-          useChroma(false),
+          useColorIFV(false),
           useSiftIFV(false),
+          useTextonIFV(false),
           buildTextonDictionary(false),
           buildFilterBank(false),
           buildSIFTDictionary(false),
           buildSIFTGmmDist(false),
-          buildChromaDictionary(false),
+          buildColorGmmDist(false),
+          buildTextonGmmDist(false),
           useComputeFeatureSet(false),
           computeEigen(true){}
 
     bool useTexton;
+    bool useTextonIFV;
     bool useSIFT;
-    bool useChroma;
+    bool useColorIFV;
     bool useSiftIFV;
 
     bool buildTextonDictionary;
+    bool buildTextonGmmDist;
     bool buildFilterBank;
     bool buildSIFTDictionary;
     bool buildSIFTGmmDist;
-    bool buildChromaDictionary;
+    bool buildColorGmmDist;
 
     bool useComputeFeatureSet;
 
@@ -156,7 +161,11 @@ public:
                                SLICSuperpixel &slic,
                                std::vector<MaterialFeatureSet> &clusterFeatureSet);
 
-    void extractTextonDist(cv::Mat img, cv::Mat mask, cv::Mat &textonDist);
+    void extractTextonDist(cv::Mat img, Mat &mask, cv::Mat &textonDist);
+
+    void extractTextonIFV(cv::Mat img, cv::Mat mask, cv::Mat &textonIfv, GMM &gmmDist);
+
+    void extractColorIFV(cv::Mat img, cv::Mat mask, cv::Mat &colorIfv, GMM &gmmDist);
 
     void extractSIFTDist(cv::Mat img, cv::Mat mask, cv::Mat &siftDist);
 
@@ -164,16 +173,15 @@ public:
 
     void buildFilterKernelSet(std::string dataAddress);
 
-//    void buildTextonDictionarySet(std::string dataAddress);
+    void buildTextonGmm(std::string dataAddress);
 
     void buildGlobalTextonDictionary(std::string dataAddress);
 
     void buildSIFTDictionary(std::string dataAddress);
 
-    void buildSiftIFVenCoder(std::string dataAddress);
+    void buildSiftIfvGMM(std::string dataAddress);
 
-
-    void buildChromaDictionary(std::string dataAddress);
+    void buildColorGMMDist(std::string dataAddress);
 
     void buildColorModelSet(std::string dataAddress);
 
@@ -195,8 +203,16 @@ private:
     std::vector<cv::Mat> m_vecFilterKernelSet;
 
     static size_t ms_nGlobalTextonDictionarySize;
+    static size_t ms_nTextonGMMClusterNum;
+    static size_t ms_nTextonIFVDimension;
+
+    static size_t ms_nColorDictionarySize;
+    static size_t ms_nColorGMMClusterNum;
+    static size_t ms_nColorIFVDimension;
+
+
     static size_t ms_nSiftDictionarySize;
-    static size_t ms_nChromaDictionarySize;
+    static size_t ms_nSiftGMMClusterNum;
     static size_t ms_nSiftIFVDimension;
 
     std::vector<size_t> m_vecClassModelSize;
@@ -206,6 +222,12 @@ private:
     cv::Mat m_globalTextonDictionary;
     cv::Mat m_siftDictionary;
     GMM m_siftGMMDist;
+    GMM m_colorGMMDist;
+    GMM m_textonGMMDist;
+
+    float m_siftScale[3];
+
+    int m_nSiftBinNum;
 
     //data dir
     std::map<int, std::string> mapIndex2FileDirectory;

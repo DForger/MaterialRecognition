@@ -9,22 +9,26 @@ int main()
     VL_PRINT("Hello world!");
     MaterialClassifier classifier;
     MaterialParam param;
-    param.buildChromaDictionary = false;
+    param.buildColorGmmDist = false;
     param.buildFilterBank = false;
     param.buildTextonDictionary = false;
+    param.buildTextonGmmDist = false;
     param.buildSIFTDictionary = false;
     param.buildSIFTGmmDist = false;
 
-    param.useSIFT = false;
+    param.useSIFT = true;
     param.useTexton = false;
-    param.useChroma = false;
-    param.useSiftIFV = true;
+    param.useColorIFV= false;
+    param.useSiftIFV = false;
+    param.useTextonIFV = false;
 
     param.computeEigen = false;
-    param.useComputeFeatureSet = false;
+    param.useComputeFeatureSet = true;
+
 
 //    classifier.buildFilterKernelSet("/home/shenyunjun/Data/FMD");
     classifier.train("/home/shenyunjun/Data/FMD", param);
+//    classifier.train("/home/shenyunjun/Data/new_data/fmd", param);
 //    classifier.train("/home/shenyunjun/Data/KTH_TIPS", param);
 }
 
