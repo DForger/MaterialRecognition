@@ -14,6 +14,7 @@
 #include <vl/dsift.h>
 #include <vl/gmm.h>
 #include <vl/fisher.h>
+#include <vl/svm.h>
 
 struct MaterialFeatureSet{
     std::vector<cv::Mat> vecMaterialFeatures;
@@ -170,7 +171,7 @@ public:
 
     void buildSIFTDictionary(std::string dataAddress);
 
-    void buildSiftIFVenCoder(std::string dataAddress);
+    void buildSiftIfvGMM(std::string dataAddress);
 
 
     void buildChromaDictionary(std::string dataAddress);
@@ -197,6 +198,7 @@ private:
     static size_t ms_nGlobalTextonDictionarySize;
     static size_t ms_nSiftDictionarySize;
     static size_t ms_nChromaDictionarySize;
+    static size_t ms_nSiftGMMClusterNum;
     static size_t ms_nSiftIFVDimension;
 
     std::vector<size_t> m_vecClassModelSize;

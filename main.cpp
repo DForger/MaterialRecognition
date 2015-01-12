@@ -13,7 +13,7 @@ int main()
     param.buildFilterBank = false;
     param.buildTextonDictionary = false;
     param.buildSIFTDictionary = false;
-    param.buildSIFTGmmDist = false;
+    param.buildSIFTGmmDist = true;
 
     param.useSIFT = false;
     param.useTexton = false;

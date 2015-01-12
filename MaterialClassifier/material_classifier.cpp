@@ -5,27 +5,27 @@ MaterialClassifier::MaterialClassifier()
     : m_nFilterKernelWidth(7),
       m_nFilterKernelSetSize(64)
 {
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/fabric/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/foliage/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/glass/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/leather/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/metal/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/paper/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/plastic/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/stone/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/water/"));
-        mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/wood/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/fabric/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/foliage/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/glass/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/leather/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/metal/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/paper/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/plastic/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/stone/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/water/"));
+    mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/wood/"));
 
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/aluminium_foil/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/brown_bread/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/corduroy/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/cotton/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/cracker/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/linen/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/orange_peel/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/sandpaper/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/sponge/"));
-//    mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/styrofoam/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(0,"/aluminium_foil/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(1,"/brown_bread/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(2,"/corduroy/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(3,"/cotton/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(4,"/cracker/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(5,"/linen/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(6,"/orange_peel/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(7,"/sandpaper/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(8,"/sponge/"));
+    //    mapIndex2FileDirectory.insert(std::pair<int, std::string>(9,"/styrofoam/"));
 
 }
 
@@ -59,7 +59,7 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
 
     if(param.useSiftIFV){
         if(param.buildSIFTGmmDist){
-            buildSiftIFVenCoder(dataAddress);
+            buildSiftIfvGMM(dataAddress);
             ms_nSiftIFVDimension = m_siftGMMDist.clusterNum*m_siftGMMDist.dimension*2;
         }else{
             int siftDim = 128;
@@ -379,6 +379,37 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
     }
 
 
+    int nDataDim = siftIfvTrainDataSet.cols;
+    int nDataSize = siftIfvTrainDataSet.rows;
+
+
+
+
+    double trainData[nDataSize*nDataDim];
+    double trainLabel[nDataSize];
+
+    float testData[nDataSize*nDataDim];
+    float testLabel[nDataSize];
+
+
+    vl_size const numData = nDataSize ;
+    vl_size const dimension = nDataDim ;
+
+    for(int i = 0 ; i <nDataSize; ++i){
+        for(int j = 0; j < nDataDim; ++j){
+            trainData[i*nDataDim + j] = siftIfvTrainDataSet.at<float>(i,j);
+        }
+        trainLabel[i] = labelTrainDataSet.at<float>(i,0);
+    }
+
+    std::vector<cv::Mat> modelSet;
+    std::vector<float> biasSet;
+
+    double lambda = 0.01;
+    const double * model ;
+    double bias ;
+
+
     //    cv::Mat combined = cv::Mat_<float>(projectedtextonBowTrainDataSet.rows, projectedtextonBowTrainDataSet.cols*2);
     //    combined.adjustROI(0, 0, 0, -9);
     //    projectedtextonBowTrainDataSet.copyTo(combined);
@@ -390,61 +421,110 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
     cv::ml::KNearest::Params knnParam;
     knnParam.isclassifier = true;
     knnParam.defaultK = 30;
-    cv::Ptr<cv::ml::KNearest> knn = cv::ml::StatModel::train<cv::ml::KNearest>(siftBowTrainDataSet, cv::ml::ROW_SAMPLE, label, knnParam);
-
-    cv::ml::Boost::Params boostParam;
-    boostParam.CVFolds = 10;
-    boostParam.maxDepth = 6;
-    cv::Ptr<cv::ml::Boost> boost = cv::ml::StatModel::train<cv::ml::Boost>(siftBowTrainDataSet, cv::ml::ROW_SAMPLE, label, boostParam);
+    cv::Ptr<cv::ml::KNearest> knn = cv::ml::StatModel::train<cv::ml::KNearest>(siftIfvTrainDataSet, cv::ml::ROW_SAMPLE, label, knnParam);
 
     cv::ml::SVM::Params svmParams;
     double epsilon = 1e-7;
-    svmParams.svmType = cv::ml::SVM::C_SVC;
+    svmParams.svmType = cv::ml::SVM::ONE_CLASS;
     svmParams.kernelType = cv::ml::SVM::LINEAR;
     svmParams.degree = 3;
     svmParams.gamma = 0.01;
     svmParams.C = 0.1;
+    svmParams.nu = 0.1;
     svmParams.termCrit = cv::TermCriteria(cv::TermCriteria::MAX_ITER+cv::TermCriteria::EPS, 100000, epsilon);
 
-    cv::Ptr<cv::ml::SVM> svm = cv::ml::StatModel::train<cv::ml::SVM>(siftIfvTrainDataSet, cv::ml::ROW_SAMPLE, label, svmParams);
-    cv::Mat sv = svm->getSupportVectors();
-    std::cout<<"support vector "<<sv.rows<<std::endl;
-    std::cout.flush();
-    svm->save("sift.xml");
+//    cv::Ptr<cv::ml::SVM> svm[10];
 
+
+    for(int i = 0; i < 10; ++i){
+        double singleLabelArray[label.rows];
+        for(int j = 0; j < label.rows; ++j){
+            if(label.at<int>(j,0) == i){
+               singleLabelArray[j] = 1;
+            }else{
+               singleLabelArray[j] = -1;
+            }
+        }
+        VlSvm * vlsvm = vl_svm_new(VlSvmSolverSgd,
+                                 trainData, dimension, numData,
+                                 singleLabelArray,
+                                 lambda) ;
+
+        vl_svm_train(vlsvm);
+
+       bias = vl_svm_get_bias(vlsvm);
+       model = vl_svm_get_weights(vlsvm);
+       int length = vl_svm_get_num_data(vlsvm);
+
+       cv::Mat modelMat = cv::Mat_<float>(length,1);
+       for(int l = 0; l < length; ++l){
+           modelMat.at<float>(l, 0) = model[l];
+       }
+
+       modelSet.push_back(modelMat);
+
+       biasSet.push_back(bias);
+//        svm[i]= cv::ml::StatModel::train<cv::ml::SVM>(siftIfvTrainDataSet, cv::ml::ROW_SAMPLE, singleLabel, svmParams);
+    }
+
+    double E_in = 0, E_out = 0;
     //compute E_in
-    cv::Mat predictedTrainLabel;
-    svm->predict(siftIfvTrainDataSet, predictedTrainLabel);
-    //    knn->findNearest(siftBowTrainDataSet, 30, predictedTrainLabel);
-    //    boost->predict(siftBowTrainDataSet, predictedTrainLabel);
-
-    double Ein = 0;
-    for(int i = 0; i < predictedTrainLabel.rows; ++i){
-        if(std::fabs(predictedTrainLabel.at<float>(i,0) - labelTrainDataSet.at<float>(i,0)) > 0.5){
-            Ein += 1;
+    for(int i = 0; i < labelTrainDataSet.rows; ++i){
+        double maxMarg = 0;
+        int maxIndex = 0;
+        for(int j = 0; j < 10; ++j){
+            cv::Mat dotPro = siftIfvTrainDataSet.row(i)* modelSet[j];
+            double marg = dotPro.at<float>(0,0) + biasSet[j];
+            if(std::fabs(marg) > maxMarg){
+                maxIndex = j;
+                maxMarg = std::fabs(marg);
+            }
+        }
+        if((labelTrainDataSet.at<float>(i,0) - maxIndex) > 0.5){
+            E_in += 1;
         }
     }
-    Ein = Ein/predictedTrainLabel.rows;
 
-    std::cout<<"Trained Ein is "<<Ein<<std::endl;
+    E_in = E_in/labelTrainDataSet.rows;
+
+    std::cout<<"E_in "<<E_in<<std::endl;
     std::cout.flush();
 
-    //compute E_out
-    cv::Mat predictedTestLabel;
-    svm->predict(siftIfvTestDataSet, predictedTestLabel);
-    //    knn->findNearest(siftBowTestDataSet, 30, predictedTestLabel);
-    //    boost->predict(siftBowTestDataSet, predictedTestLabel);
 
-    double Eout = 0;
-    for(int i = 0; i < predictedTestLabel.rows; ++i){
-        if(std::fabs(predictedTestLabel.at<float>(i,0) - labelTestDataSet.at<float>(i,0)) > 0.5){
-            Eout += 1;
-        }
-    }
-    Eout = Eout/predictedTestLabel.rows;
+/*
 
-    std::cout<<"Trained Eout is "<<Eout<<std::endl;
-    std::cout.flush();
+  */
+    //compute E_in
+//    cv::Mat predictedTrainLabel;
+//        svm->predict(siftIfvTrainDataSet, predictedTrainLabel);
+////    knn->findNearest(siftIfvTrainDataSet, 30, predictedTrainLabel);
+
+//    double Ein = 0;
+//    for(int i = 0; i < predictedTrainLabel.rows; ++i){
+//        if(std::fabs(predictedTrainLabel.at<float>(i,0) - labelTrainDataSet.at<float>(i,0)) > 0.5){
+//            Ein += 1;
+//        }
+//    }
+//    Ein = Ein/predictedTrainLabel.rows;
+
+//    std::cout<<"Trained Ein is "<<Ein<<std::endl;
+//    std::cout.flush();
+
+//    //compute E_out
+//    cv::Mat predictedTestLabel;
+//        svm->predict(siftIfvTestDataSet, predictedTestLabel);
+////    knn->findNearest(siftIfvTestDataSet, 30, predictedTestLabel);
+
+//    double Eout = 0;
+//    for(int i = 0; i < predictedTestLabel.rows; ++i){
+//        if(std::fabs(predictedTestLabel.at<float>(i,0) - labelTestDataSet.at<float>(i,0)) > 0.5){
+//            Eout += 1;
+//        }
+//    }
+//    Eout = Eout/predictedTestLabel.rows;
+
+//    std::cout<<"Trained Eout is "<<Eout<<std::endl;
+//    std::cout.flush();
 
 }
 
@@ -1066,13 +1146,13 @@ void MaterialClassifier::buildSIFTDictionary(string dataAddress)
     Miscellaneous::IO::data2Text_<float>(centers, dataAddress+"/sift_dictionary");
 }
 
-void MaterialClassifier::buildSiftIFVenCoder(string dataAddress)
+void MaterialClassifier::buildSiftIfvGMM(string dataAddress)
 {
     int nMaxDataSize = 3000000;
     int nSiftDim = 128;
     cv::Mat siftDescriptorSet = cv::Mat_<float>(nMaxDataSize, nSiftDim);
 
-//    Miscellaneous::IO::readData_<float>(siftDescriptorSet,dataAddress+"/sift_descriptors_set");
+    //    Miscellaneous::IO::readData_<float>(siftDescriptorSet,dataAddress+"/sift_descriptors_set");
     int nDataCnt = 0;
     for(int i = 0; i  < mapIndex2FileDirectory.size(); ++i){
         std::string strImgDirAddress = dataAddress+"/image"+mapIndex2FileDirectory[i];
@@ -1159,22 +1239,21 @@ void MaterialClassifier::buildSiftIFVenCoder(string dataAddress)
 
     Miscellaneous::IO::data2Text_<float>(siftDescriptorSet, dataAddress+"/sift_descriptors_set");
 
-//    cv::Mat siftDescriptorSet;
-//    Miscellaneous::IO::readData_<float>(siftDescriptorSet, dataAddress+"/sift_descriptors_set");
+    //    cv::Mat siftDescriptorSet;
+    //    Miscellaneous::IO::readData_<float>(siftDescriptorSet, dataAddress+"/sift_descriptors_set");
     int descriptorNum = siftDescriptorSet.rows;
     int descriptorSize = siftDescriptorSet.cols;
-    float data[800000];
+    float data[1000000];
 
-    int cnt = 0;
-    int maxNum = 800000/128;
+    int maxNum = 1000000/128;
     for(int i = 0; i < maxNum; ++i){
-//        float *srcPtr = siftDescriptorSet.ptr<float>(i);
-//        float *dstPtr = data + i*siftDescriptorSet.cols;
-//        for(int j = 0; j < siftDescriptorSet.cols; ++j){
-//            *dstPtr = *srcPtr;
-//            ++dstPtr;
-//            ++srcPtr;
-//        }
+        //        float *srcPtr = siftDescriptorSet.ptr<float>(i);
+        //        float *dstPtr = data + i*siftDescriptorSet.cols;
+        //        for(int j = 0; j < siftDescriptorSet.cols; ++j){
+        //            *dstPtr = *srcPtr;
+        //            ++dstPtr;
+        //            ++srcPtr;
+        //        }
         for(int j = 0; j <descriptorSize; ++j){
             data[i*descriptorSize + j] = siftDescriptorSet.at<float>(i,j);
         }
@@ -1182,7 +1261,7 @@ void MaterialClassifier::buildSiftIFVenCoder(string dataAddress)
 
     int dimension = nSiftDim;
     int numData = maxNum;
-    int numClusters = ms_nSiftDictionarySize;
+    int numClusters = ms_nSiftGMMClusterNum;
 
     VlGMM *gmm = vl_gmm_new (VL_TYPE_FLOAT, nSiftDim, numClusters) ;
     vl_gmm_cluster(gmm, data, numData);
@@ -1318,4 +1397,5 @@ void MaterialClassifier::buildModelSet(string dataAddress)
 size_t MaterialClassifier::ms_nGlobalTextonDictionarySize = 48;
 size_t MaterialClassifier::ms_nChromaDictionarySize = 64;
 size_t MaterialClassifier::ms_nSiftDictionarySize = 128;
+size_t MaterialClassifier::ms_nSiftGMMClusterNum = 128;
 size_t MaterialClassifier::ms_nSiftIFVDimension = 60;
