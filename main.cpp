@@ -14,7 +14,7 @@ int main()
     param.buildTextonDictionary = false;
     param.buildTextonGmmDist = false;
     param.buildSIFTDictionary = false;
-    param.buildSIFTGmmDist = false;
+    param.buildSIFTGmmDist = true;
 
     param.useSIFT = true;
     param.useTexton = false;

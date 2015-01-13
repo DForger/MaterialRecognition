@@ -349,8 +349,10 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
                     imgSiftIfvAddress.append("_sift_ifv");
                     Miscellaneous::IO::data2Text_<float>(siftIfv, imgSiftIfvAddress);
 
+
                     float *srcPtr;
                     float *dstPtr ;
+
                     if(nImgCnt >= nTrainDataSize){
                         srcPtr = siftIfv.ptr<float>(0);
                         dstPtr = siftIfvTestDataSet.ptr<float>(nTestDataCnt);
@@ -768,6 +770,11 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
         imshow("confuseMat", confuseMat/50.0);
         cv::waitKey(0);
 
+    double Eout = 0;
+    for(int i = 0; i < predictedTestLabel.rows; ++i){
+        if(std::fabs(predictedTestLabel.at<float>(i,0) - labelTestDataSet.at<float>(i,0)) > 0.5){
+            Eout += 1;
+        }
     }
     //    for(int i = 0; i < 10; ++i){
     //        double singleLabelArray[label.rows];
@@ -965,6 +972,8 @@ void MaterialClassifier::extractTextonDist(cv::Mat img, cv::Mat &mask,  cv::Mat 
             maskPtr = maskPtr + nSampleStep;
             if(maskValue < 10){
                 continue;
+            }else{
+                ++maskPtr;
             }
             float *basePtr = totalResponseMat.ptr<float>(i)+k*m_nFilterKernelSetSize;
             float *responsePtr = basePtr;
@@ -1002,6 +1011,7 @@ void MaterialClassifier::extractTextonDist(cv::Mat img, cv::Mat &mask,  cv::Mat 
             }
 
             voteSum += 1;
+
         }
     }
 
@@ -1381,6 +1391,8 @@ void MaterialClassifier::extractSiftIFV(Mat _img, Mat mask, Mat &siftIfv, GMM &g
     }
 
     siftIfv = siftHist;
+
+    vl_dsift_delete(dsift);
 }
 
 void MaterialClassifier::buildFilterKernelSet(string dataAddress)
@@ -1981,6 +1993,7 @@ void MaterialClassifier::buildSiftIfvGMM(string dataAddress)
                         ++srcPtr;
                     }
                 }
+            }
 
                 //detect dense sift
                 VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 8, m_nSiftBinNum);
@@ -2022,6 +2035,7 @@ void MaterialClassifier::buildSiftIfvGMM(string dataAddress)
                 }
                 vl_dsift_delete(dsift);
             }
+            vl_dsift_delete(dsift);
             //            Miscellaneous::IO::data2Text_<float>(siftDescriptor, imgSiftSaveAddress);
         }
         closedir(pDir);
@@ -2087,6 +2101,7 @@ void MaterialClassifier::buildSiftIfvGMM(string dataAddress)
     Miscellaneous::IO::data2Text_<float>(siftGmmInfo, dataAddress+"/sift_gmm_info");
 
     m_siftGMMDist.load(std::string(dataAddress+"/sift_gmm_info"), dimension);
+
 }
 
 void MaterialClassifier::buildColorGMMDist(string dataAddress)
