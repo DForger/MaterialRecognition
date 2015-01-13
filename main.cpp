@@ -14,12 +14,12 @@ int main()
     param.buildTextonDictionary = false;
     param.buildTextonGmmDist = false;
     param.buildSIFTDictionary = false;
-    param.buildSIFTGmmDist = true;
+    param.buildSIFTGmmDist = false;
 
-    param.useSIFT = true;
+    param.useSIFT = false;
     param.useTexton = false;
     param.useColorIFV= false;
-    param.useSiftIFV = false;
+    param.useSiftIFV = true;
     param.useTextonIFV = false;
 
     param.computeEigen = false;

@@ -466,9 +466,10 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
         }
 
         if(param.useSiftIFV){
-//            Miscellaneous::IO::readData_<float>(siftIfvTrainDataSet, dataAddress+"/org_sift_ifv_train_data");
-//            Miscellaneous::IO::readData_<float>(siftIfvTestDataSet, dataAddress+"/org_sift_ifv_test_data");
+           Miscellaneous::IO::readData_<float>(siftIfvTrainDataSet, dataAddress+"/org_sift_ifv_train_data");
+            Miscellaneous::IO::readData_<float>(siftIfvTestDataSet, dataAddress+"/org_sift_ifv_test_data");
 
+            /*
                          cv::Mat normTrainDataSet, normTestDataSet, microTrainDataSet, microTestDataSet;
                         Miscellaneous::IO::readData_<float>(normTrainDataSet, dataAddress+"/org_sift_ifv_train_data");
                         Miscellaneous::IO::readData_<float>(normTestDataSet, dataAddress+"/org_sift_ifv_test_data");
@@ -491,7 +492,8 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
                         microTestDataSet.copyTo(siftIfvTestDataSet);
                         siftIfvTestDataSet.adjustROI(0,0, normLength, 0);
                         siftIfvTrainDataSet.adjustROI(0, 0, normLength, 0);
-        }
+ */
+ }
 
         if(param.useColorIFV){
             Miscellaneous::IO::readData_<float>(colorIfvTrainDataSet, dataAddress+"/org_color_ifv_train_data");
@@ -769,13 +771,16 @@ void MaterialClassifier::train(string dataAddress, MaterialParam &param)
         cv::namedWindow("confuseMat", cv::WINDOW_NORMAL);
         imshow("confuseMat", confuseMat/50.0);
         cv::waitKey(0);
+    }
 
+        /*
     double Eout = 0;
     for(int i = 0; i < predictedTestLabel.rows; ++i){
         if(std::fabs(predictedTestLabel.at<float>(i,0) - labelTestDataSet.at<float>(i,0)) > 0.5){
             Eout += 1;
         }
     }
+    */
     //    for(int i = 0; i < 10; ++i){
     //        double singleLabelArray[label.rows];
     //        for(int j = 0; j < label.rows; ++j){
@@ -1391,8 +1396,6 @@ void MaterialClassifier::extractSiftIFV(Mat _img, Mat mask, Mat &siftIfv, GMM &g
     }
 
     siftIfv = siftHist;
-
-    vl_dsift_delete(dsift);
 }
 
 void MaterialClassifier::buildFilterKernelSet(string dataAddress)
@@ -1993,7 +1996,6 @@ void MaterialClassifier::buildSiftIfvGMM(string dataAddress)
                         ++srcPtr;
                     }
                 }
-            }
 
                 //detect dense sift
                 VlDsiftFilter *dsift = vl_dsift_new_basic(nCol, nRow, 8, m_nSiftBinNum);
@@ -2035,7 +2037,6 @@ void MaterialClassifier::buildSiftIfvGMM(string dataAddress)
                 }
                 vl_dsift_delete(dsift);
             }
-            vl_dsift_delete(dsift);
             //            Miscellaneous::IO::data2Text_<float>(siftDescriptor, imgSiftSaveAddress);
         }
         closedir(pDir);
